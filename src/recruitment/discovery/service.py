@@ -21,7 +21,7 @@ from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from googlesearch import search
 
-from ...logging_config import get_metrics_logger, setup_logging
+from recruitment.common.logging_config import get_metrics_logger, setup_logging
 
 # =============================
 # 0. Settings – one source only
@@ -115,7 +115,9 @@ async def gsearch_async(term, limit):
     loop = asyncio.get_running_loop()
     try:
         # First attempt: new approach with num_results
-        return await loop.run_in_executor(_executor, lambda: list(search(term, num_results=limit)))
+        return await loop.run_in_executor(
+            _executor, lambda: list(search(term, num_results=limit))
+        )
     except Exception as e:
         logger.warning(f"New search method failed: {e}, trying fallback...")
         # Fallback: original approach with tld, num, stop, pause

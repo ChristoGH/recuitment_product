@@ -1,0 +1,54 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+logs/
+databases/
+*.log
+*.sqlite
+*.db
+
+# Test
+tests/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+ci/
+.github/ 
+
+.mypy_cache/
+__pycache__/
+*.py[cod]
+*$py.class

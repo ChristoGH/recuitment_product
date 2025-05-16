@@ -16,6 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
+
+# Then in the class:
+
 import aio_pika
 import psutil
 from dotenv import load_dotenv
@@ -28,11 +31,11 @@ from tenacity import (
     wait_exponential,
 )
 
-from src.recruitment.db.repository import RecruitmentDatabase
+from recruitment.db.repository import RecruitmentDatabase
 
-from ...logging_config import get_metrics_logger, setup_logging
-from ...utils.rabbitmq import RABBIT_QUEUE
-from ...utils.web_crawler_wrapper import crawl_website
+from recruitment.common.logging_config import get_metrics_logger, setup_logging
+from recruitment.common.rabbitmq import RABBIT_QUEUE
+from recruitment.common.web_crawler import crawl_website
 
 # Load environment variables
 load_dotenv()
@@ -111,7 +114,7 @@ class URLProcessor:
         """
         self.db = RecruitmentDatabase(db_path)  # Removed readonly=True
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.processing_queue = Queue()
+        self.processing_queue: Queue[Dict[str, Any]] = Queue()
         self.processing_tasks: List[Task] = []
 
     async def start(self):
@@ -151,7 +154,9 @@ class URLProcessor:
                 urls_to_process = []
                 for _ in range(BATCH_SIZE):
                     try:
-                        url_data = await asyncio.wait_for(self.processing_queue.get(), timeout=1.0)
+                        url_data = await asyncio.wait_for(
+                            self.processing_queue.get(), timeout=1.0
+                        )
                         urls_to_process.append(url_data)
                     except asyncio.TimeoutError:
                         break
@@ -176,7 +181,9 @@ class URLProcessor:
                             extra={"url": url_data["url"], "error": str(result)},
                         )
                     else:
-                        logger.info("URL processing completed", extra={"url": url_data["url"]})
+                        logger.info(
+                            "URL processing completed", extra={"url": url_data["url"]}
+                        )
 
             except asyncio.CancelledError:
                 break
@@ -221,8 +228,7 @@ class URLProcessor:
             result = await self._crawl_with_retry(url)
 
             # First ensure URL exists and get its ID
-            conn = await self.db._get_connection()
-            try:
+            async with self.db._get_connection() as conn:
                 async with conn.cursor() as cursor:
                     # Insert URL if not exists with upsert
                     await cursor.execute(
@@ -267,8 +273,6 @@ class URLProcessor:
                             },
                         )
                         raise
-            finally:
-                await self.db._release_connection(conn)
 
             logger.info(
                 "URL processed successfully",
@@ -288,7 +292,9 @@ class URLProcessor:
             await self._publish_to_dead_letter(url_data, str(e))
             raise
 
-    async def _publish_to_dead_letter(self, url_data: Dict[str, Any], error: str) -> None:
+    async def _publish_to_dead_letter(
+        self, url_data: Dict[str, Any], error: str
+    ) -> None:
         """Publish failed URL to dead-letter queue.
 
         Args:
@@ -317,7 +323,9 @@ class URLProcessor:
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 )
 
-                await channel.default_exchange.publish(message, routing_key=DEAD_LETTER_QUEUE)
+                await channel.default_exchange.publish(
+                    message, routing_key=DEAD_LETTER_QUEUE
+                )
 
                 logger.info(
                     "Published to dead-letter queue",
@@ -330,7 +338,9 @@ class URLProcessor:
             )
 
 
-async def process_message(message: aio_pika.IncomingMessage, processor: URLProcessor) -> None:
+async def process_message(
+    message: aio_pika.IncomingMessage, processor: URLProcessor
+) -> None:
     """Process a single message with timeout."""
     start_time = datetime.now()
 

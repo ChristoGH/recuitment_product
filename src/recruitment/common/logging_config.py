@@ -7,7 +7,7 @@ import platform
 import socket
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import psutil
 
@@ -17,16 +17,19 @@ project_root = Path(__file__).parent.parent.parent
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = "json"
-LOG_DIR = os.getenv("LOG_DIR", str(project_root / "logs"))
+LOG_DIR_PATH = os.getenv("LOG_DIR", str(project_root / "logs"))
 SERVICE_NAME = os.getenv("SERVICE_NAME", "recruitment")
 
 # Ensure log directory exists
 try:
-    os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR_PATH, exist_ok=True)
+    LOG_DIR = LOG_DIR_PATH  # Set LOG_DIR only after successful creation
 except OSError as e:
     # If we can't create the directory, fall back to console-only logging
-    LOG_DIR = None
-    print(f"Warning: Could not create log directory: {e}. Falling back to console-only logging.")
+    LOG_DIR = ""  # Empty string instead of None
+    print(
+        f"Warning: Could not create log directory: {e}. Falling back to console-only logging."
+    )
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -88,7 +91,7 @@ class StructuredLogFormatter(logging.Formatter):
         }
 
         # Add exception info if present
-        if record.exc_info:
+        if record.exc_info and record.exc_info[0]:
             log_entry["exception"] = {
                 "type": record.exc_info[0].__name__,
                 "message": str(record.exc_info[1]),
@@ -167,7 +170,7 @@ def setup_logging(name: str) -> logging.Logger:
     logger.handlers = []
 
     # Create handlers
-    handlers = []
+    handlers: List[logging.Handler] = []
 
     # Console handler
     console_handler = logging.StreamHandler()
